@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BudgetGuard 残高ウォッチ</string>
+    <string name="notification_channel_balance_name">残高通知</string>
+    <string name="notification_channel_balance_desc">支出を検知するたびに残り予算をお知らせします</string>
+</resources>
