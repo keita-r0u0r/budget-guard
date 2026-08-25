@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Android 13+ requires runtime permission to post notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Needed to keep listening reliably after boot / app kill (optional, user can disable) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!--
+      Needed so the "監視アプリ選択" screen can list all installed apps (banking/card apps are
+      unknown ahead of time, so we can't declare narrow <queries> entries for them). This is fine
+      for a personal prototype sideloaded via Android Studio; if this app is ever published on
+      Google Play, QUERY_ALL_PACKAGES requires a Play Console declaration/justification, or you'd
+      need to switch to an explicit <queries> allow-list of known banking/card app packages.
+    -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <application
+        android:name=".BudgetGuardApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BudgetGuard"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.BudgetGuard">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          NotificationListenerService: this is what lets BudgetGuard "see" spend
+          notifications posted by other apps (credit card apps, bank apps, PayPay, etc).
+          The user must explicitly grant this in
+          Settings > Apps > Special access > Notification access.
+        -->
+        <service
+            android:name=".notification.SpendingNotificationListenerService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>
