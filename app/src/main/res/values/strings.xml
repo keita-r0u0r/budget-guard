@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">BudgetGuard 残高ウォッチ</string>
-    <string name="notification_channel_balance_name">残高通知</string>
+    <string name="notification_channel_balance_name">支出検知の通知</string>
     <string name="notification_channel_balance_desc">支出を検知するたびに残り予算をお知らせします</string>
+    <string name="notification_channel_status_name">残高の常時表示</string>
+    <string name="notification_channel_status_desc">今月の残額と1日あたりのペースを通知シェードに常に表示します</string>
+    <string name="widget_description">今月の残額と1日あたりのペースをホーム画面に表示します</string>
 </resources>

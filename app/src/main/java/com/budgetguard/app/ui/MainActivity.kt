@@ -62,11 +62,14 @@ private fun BudgetGuardApp(viewModel: BudgetViewModel = viewModel()) {
     // Notification-access is a system Settings toggle with no in-app callback, so we recheck it
     // every time the activity resumes (e.g. the user comes back from the settings screen).
     var notificationAccessEnabled by remember { mutableStateOf(NotificationAccess.isEnabled(context)) }
+    var listenerConnected by remember { mutableStateOf(NotificationAccess.isListenerConnected()) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 notificationAccessEnabled = NotificationAccess.isEnabled(context)
+                listenerConnected = NotificationAccess.isListenerConnected()
+                viewModel.refreshBalanceSurfaces()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -88,6 +91,8 @@ private fun BudgetGuardApp(viewModel: BudgetViewModel = viewModel()) {
     val transactions by viewModel.recentTransactions.collectAsState()
     val logs by viewModel.notificationLogs.collectAsState()
     val monitoredPackages by viewModel.monitoredPackages.collectAsState()
+    val logAllNotifications by viewModel.logAllNotifications.collectAsState()
+    val persistentNotificationEnabled by viewModel.persistentNotificationEnabled.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -118,7 +123,15 @@ private fun BudgetGuardApp(viewModel: BudgetViewModel = viewModel()) {
                 status = status,
                 transactions = transactions,
                 notificationAccessEnabled = notificationAccessEnabled,
+                listenerConnected = listenerConnected,
                 onOpenNotificationAccessSettings = { NotificationAccess.openSettings(context) },
+                onRequestRebind = {
+                    NotificationAccess.requestRebind(context)
+                    listenerConnected = NotificationAccess.isListenerConnected()
+                },
+                onAddTestTransaction = { viewModel.addTestTransaction() },
+                persistentNotificationEnabled = persistentNotificationEnabled,
+                onTogglePersistentNotification = viewModel::setPersistentNotificationEnabled,
                 onSetBudget = viewModel::setMonthlyBudget,
                 onDeleteTransaction = viewModel::deleteTransaction,
                 modifier = Modifier.padding(padding),
@@ -130,6 +143,9 @@ private fun BudgetGuardApp(viewModel: BudgetViewModel = viewModel()) {
             )
             Tab.LOG -> NotificationLogScreen(
                 logs = logs,
+                logAllNotifications = logAllNotifications,
+                onToggleLogAll = viewModel::setLogAllNotifications,
+                monitoredPackages = monitoredPackages,
                 modifier = Modifier.padding(padding),
             )
         }

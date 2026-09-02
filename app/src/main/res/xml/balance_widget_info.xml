@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  updatePeriodMillis is deliberately absent (i.e. 0 = never). Its floor is 30 minutes and it is
+  skipped entirely while the device dozes, so it cannot be trusted to catch a date rollover.
+  DayRolloverScheduler owns that job via an exact alarm instead.
+
+  targetCell* asks for 4x2 by default on Android 12+; minWidth/minHeight stay at roughly 2x1 so
+  the user can still shrink it. Only one layout exists for now, so a shrunk widget just clips.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_balance"
+    android:previewLayout="@layout/widget_balance"
+    android:description="@string/widget_description"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

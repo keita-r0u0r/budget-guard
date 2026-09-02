@@ -15,9 +15,12 @@ import kotlinx.coroutines.launch
  * The core detection mechanism: this is what lets BudgetGuard "see" a spend without the user
  * typing anything in. Android calls [onNotificationPosted] for every notification on the device
  * once the user grants Notification Access (Settings > Apps > Special access > Notification
- * access > BudgetGuard). We only act on notifications from apps the user has explicitly added
- * to the monitored list ([com.budgetguard.app.data.BudgetPreferences.monitoredPackages]) --
- * everything else is ignored.
+ * access > BudgetGuard). Only apps the user has explicitly added to the monitored list
+ * ([com.budgetguard.app.data.BudgetPreferences.monitoredPackages]) can create a transaction.
+ *
+ * When [com.budgetguard.app.data.BudgetPreferences.logAllNotifications] is on, notifications from
+ * *other* apps are still written to the notification log (never counted as spend) purely so the
+ * user can discover which package actually announces a purchase for a given payment method.
  *
  * This is one implementation of what the README calls a "spending event source". A future
  * source (email parsing, a bank aggregation API, SMS) would live alongside this file and write
@@ -38,11 +41,18 @@ class SpendingNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
+
+        // Never react to our own "支出¥X / 残り¥Y" notifications -- they contain a yen amount, so
+        // without this guard the app would read its own output back as new spending.
+        if (packageName == applicationContext.packageName) return
+
         val repo = BudgetRepository.get(applicationContext)
 
         serviceScope.launch {
             val monitored = repo.preferences.monitoredPackages.first()
-            if (packageName !in monitored) return@launch
+            val isMonitored = packageName in monitored
+            val logAll = repo.preferences.logAllNotifications.first()
+            if (!isMonitored && !logAll) return@launch
 
             val extras = sbn.notification.extras
             val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
@@ -52,8 +62,12 @@ class SpendingNotificationListenerService : NotificationListenerService() {
             val fingerprint = "${sbn.key}:$title:$text"
             if (!markSeen(fingerprint)) return@launch
 
-            val parser = parserRegistry.parserFor(packageName)
-            val amount = parser.parse(title, text)
+            // Only monitored apps are parsed for an amount; everything else is log-only.
+            val amount = if (isMonitored) {
+                parserRegistry.parserFor(packageName).parse(title, text)
+            } else {
+                null
+            }
 
             repo.logNotification(
                 NotificationLogEntity(
@@ -75,6 +89,7 @@ class SpendingNotificationListenerService : NotificationListenerService() {
                     timestampMillis = sbn.postTime,
                 )
                 BalanceNotifier.notifyBalance(applicationContext, result)
+                BalanceSurfaces.refresh(applicationContext)
             }
             // amount == null: logged for later tuning in the 通知ログ screen, but not counted as
             // spend -- better to miss a transaction the user notices is missing than to silently
@@ -91,8 +106,24 @@ class SpendingNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        // No-op today. Extension point: could reconcile against sbn history via
-        // getActiveNotifications() here if we ever want to catch up on notifications posted
-        // while the listener was disconnected.
+        isConnected = true
+        // Extension point: could reconcile against getActiveNotifications() here to catch up on
+        // notifications still sitting in the shade from while we were disconnected.
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        isConnected = false
+    }
+
+    companion object {
+        /**
+         * Set from the bind callbacks so the UI can tell "permission granted but service never
+         * bound" (the usual post-reinstall failure) apart from "permission missing". Lives in the
+         * same process as the UI, so a plain volatile flag is enough.
+         */
+        @Volatile
+        var isConnected: Boolean = false
+            private set
     }
 }

@@ -1,10 +1,11 @@
 package com.budgetguard.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -26,6 +27,8 @@ class BudgetPreferences(private val context: Context) {
         val MONTHLY_BUDGET_YEN = longPreferencesKey("monthly_budget_yen")
         val BUDGET_RESET_DAY = intPreferencesKey("budget_reset_day")
         val MONITORED_PACKAGES = stringSetPreferencesKey("monitored_packages")
+        val LOG_ALL_NOTIFICATIONS = booleanPreferencesKey("log_all_notifications")
+        val PERSISTENT_NOTIFICATION = booleanPreferencesKey("persistent_notification")
     }
 
     val monthlyBudgetYen: Flow<Long> =
@@ -38,6 +41,30 @@ class BudgetPreferences(private val context: Context) {
     val monitoredPackages: Flow<Set<String>> =
         context.dataStore.data.map { it[Keys.MONITORED_PACKAGES] ?: DEFAULT_MONITORED_PACKAGES }
 
+    /**
+     * Debug aid: when true, every notification from every app is written to the notification log
+     * (but only monitored apps ever create a transaction). This is how you discover which package
+     * actually posts the "you spent money" notification for a given payment method -- e.g. a
+     * vending-machine tap might surface as Google Wallet, モバイルSuica, or the card app itself,
+     * and you can't know which without seeing the raw feed. Defaults on for the prototype; turn
+     * it off once the right packages are identified, since it logs unrelated notifications too.
+     */
+    val logAllNotifications: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.LOG_ALL_NOTIFICATIONS] ?: true }
+
+    /**
+     * Whether to keep a permanent, silent notification in the shade showing today's remaining
+     * allowance. This is the main "把握しやすさ" surface -- the number is only useful if it's
+     * where the user already looks -- but it is genuinely a matter of taste how much notification
+     * shade real estate someone wants to give up, so it stays user-controlled.
+     */
+    val persistentNotificationEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.PERSISTENT_NOTIFICATION] ?: true }
+
+    suspend fun setPersistentNotificationEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.PERSISTENT_NOTIFICATION] = enabled }
+    }
+
     suspend fun setMonthlyBudget(amountYen: Long) {
         context.dataStore.edit { it[Keys.MONTHLY_BUDGET_YEN] = amountYen }
     }
@@ -48,6 +75,10 @@ class BudgetPreferences(private val context: Context) {
 
     suspend fun setMonitoredPackages(packages: Set<String>) {
         context.dataStore.edit { it[Keys.MONITORED_PACKAGES] = packages }
+    }
+
+    suspend fun setLogAllNotifications(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.LOG_ALL_NOTIFICATIONS] = enabled }
     }
 
     suspend fun addMonitoredPackage(packageName: String) {

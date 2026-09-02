@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!--
+      Used once a day to repaint the widget and the shade notification the moment the date
+      changes. Without an exact alarm the numbers sit stale all morning on an idle phone, because
+      the widget's own update cycle is skipped during Doze. On API 33+ this is not granted by
+      default; DayRolloverScheduler checks canScheduleExactAlarms() and degrades to an inexact
+      alarm rather than crashing.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!--
       Needed so the "監視アプリ選択" screen can list all installed apps (banking/card apps are
       unknown ahead of time, so we can't declare narrow <queries> entries for them). This is fine
       for a personal prototype sideloaded via Android Studio; if this app is ever published on
@@ -46,16 +54,52 @@
           notifications posted by other apps (credit card apps, bank apps, PayPay, etc).
           The user must explicitly grant this in
           Settings > Apps > Special access > Notification access.
+
+          exported MUST be true: the system_server binds this service from outside the app, so
+          exported="false" makes the bind silently fail — the app still shows up in the
+          notification-access list and can be toggled on, but onNotificationPosted is never
+          called. Access is still safe because only a caller holding
+          BIND_NOTIFICATION_LISTENER_SERVICE (i.e. the system) can bind.
         -->
         <service
             android:name=".notification.SpendingNotificationListenerService"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!--
+          Home screen widget. exported MUST be true here for the same reason as the notification
+          listener above: the launcher/system delivers APPWIDGET_UPDATE from outside the app.
+        -->
+        <receiver
+            android:name=".widget.BalanceWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/balance_widget_info" />
+        </receiver>
+
+        <!--
+          Day rollover. exported MUST be true for the same reason as the two components above:
+          BOOT_COMPLETED and TIME_SET are delivered by the system, from outside this app's UID.
+          The alarm itself arrives as an explicit intent, so nothing else can usefully reach it.
+        -->
+        <receiver
+            android:name=".schedule.DayRolloverReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

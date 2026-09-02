@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  4x2 widget. Order is deliberate: the period remainder leads, and the per-day figure sits
+  underneath it as a pace hint rather than a second balance. Calling the small number
+  "1日 ¥X ペース" instead of "今日あと ¥X" is what stops the two numbers competing for the eye.
+
+  RemoteViews limits what can go in here: no ConstraintLayout, no autoSizeTextType. Hence the
+  plain vertical LinearLayout, and the amount size is switched from code with
+  setTextViewTextSize() when the digit count grows.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="10dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/widget_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="今月あと"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="--"
+        android:textColor="@color/widget_text_primary"
+        android:textSize="40sp"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!--
+      Progress is the share of the period's DAYS that have elapsed, not the share of the money
+      spent. A money bar would only restate the number above it; a day bar sitting next to the
+      money number is what makes "spending faster than the clock" visible.
+    -->
+    <ProgressBar
+        android:id="@+id/widget_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="7dp"
+        android:layout_marginBottom="7dp"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="@color/widget_progress"
+        android:progressBackgroundTint="@color/widget_progress_track" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <TextView
+            android:id="@+id/widget_days"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/widget_pace"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:gravity="end"
+            android:text=""
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
+</LinearLayout>
