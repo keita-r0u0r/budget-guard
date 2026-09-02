@@ -1,0 +1,11 @@
+<resources>
+    <!-- Same card, dialled down: a bright panel on a dark home screen is the thing people
+         actually complain about, so the background gets deeper and the secondary text less
+         bright while contrast on the main number stays maximal. -->
+    <color name="widget_background">#F0102915</color>
+    <color name="widget_text_primary">#FFFFFFFF</color>
+    <color name="widget_text_secondary">#B3FFFFFF</color>
+    <color name="widget_progress">#FF66BB6A</color>
+    <color name="widget_progress_track">#33FFFFFF</color>
+    <color name="widget_over">#FFEF9A9A</color>
+</resources>

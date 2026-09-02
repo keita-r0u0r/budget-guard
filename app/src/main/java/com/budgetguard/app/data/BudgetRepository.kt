@@ -23,10 +23,40 @@ class BudgetRepository(context: Context) {
         val periodLabel: String,
         val budgetYen: Long,
         val spentYen: Long,
+        val remainingDays: Int,
+        val totalDays: Int,
     ) {
         val remainingYen: Long get() = budgetYen - spentYen
         val isOverBudget: Boolean get() = remainingYen < 0
         val spentRatio: Float get() = if (budgetYen <= 0) 0f else (spentYen.toFloat() / budgetYen).coerceIn(0f, 1f)
+
+        /**
+         * How much of the period's *time* is gone, 0f..1f. Shown as the progress bar on every
+         * surface, deliberately in preference to [spentRatio]: a money bar would only restate the
+         * remaining figure printed right above it, whereas a day bar next to a money figure is
+         * what makes "spending faster than the calendar" legible at a glance.
+         *
+         * Counts whole days already finished, so it reads 0 on day one and never quite reaches
+         * full while today is still spendable.
+         */
+        val elapsedRatio: Float
+            get() = if (totalDays <= 0) 0f
+            else ((totalDays - remainingDays).toFloat() / totalDays).coerceIn(0f, 1f)
+
+        /**
+         * The rest of the budget spread evenly over the days left -- surfaced as
+         * "1日 ¥X ペース", never as "今日あと ¥X".
+         *
+         * The headline number is the period remainder ([remainingYen]); this is its companion.
+         * A period remainder alone can't be acted on without knowing whether 3 days or 20 remain,
+         * which is exactly what this figure (plus [remainingDays]) supplies. Wording it as a pace
+         * rather than a balance matters: two balances side by side compete for attention and
+         * neither reads as the main number.
+         *
+         * Overspending today shrinks tomorrow's figure by itself, so the pace still self-corrects.
+         */
+        val dailyAllowanceYen: Long
+            get() = if (remainingYen <= 0) 0L else remainingYen / remainingDays
     }
 
     /**
@@ -50,6 +80,8 @@ class BudgetRepository(context: Context) {
                                     periodLabel = BudgetPeriod.label(periodKey),
                                     budgetYen = budget,
                                     spentYen = spent,
+                                    remainingDays = BudgetPeriod.remainingDays(resetDay),
+                                    totalDays = BudgetPeriod.totalDays(periodKey, resetDay),
                                 )
                             )
                         }

@@ -21,6 +21,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.budgetguard.app.data.BudgetRepository
 import com.budgetguard.app.data.TransactionEntity
+import com.budgetguard.app.notification.BalanceSurfaces
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,7 +49,12 @@ fun DashboardScreen(
     status: BudgetRepository.BudgetStatus?,
     transactions: List<TransactionEntity>,
     notificationAccessEnabled: Boolean,
+    listenerConnected: Boolean,
     onOpenNotificationAccessSettings: () -> Unit,
+    onRequestRebind: () -> Unit,
+    onAddTestTransaction: () -> Unit,
+    persistentNotificationEnabled: Boolean,
+    onTogglePersistentNotification: (Boolean) -> Unit,
     onSetBudget: (Long) -> Unit,
     onDeleteTransaction: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -66,9 +73,26 @@ fun DashboardScreen(
         }
 
         item {
+            DiagnosticsCard(
+                notificationAccessEnabled = notificationAccessEnabled,
+                listenerConnected = listenerConnected,
+                onOpenSettings = onOpenNotificationAccessSettings,
+                onRequestRebind = onRequestRebind,
+                onAddTestTransaction = onAddTestTransaction,
+            )
+        }
+
+        item {
             BalanceCard(
                 status = status,
                 onEditBudget = { showBudgetDialog = true },
+            )
+        }
+
+        item {
+            PersistentNotificationToggle(
+                enabled = persistentNotificationEnabled,
+                onToggle = onTogglePersistentNotification,
             )
         }
 
@@ -147,23 +171,35 @@ private fun BalanceCard(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            // Same order and the same words as the widget and the shade notification, and for
+            // the same reason: the period remainder leads, the per-day figure supports it as a
+            // *pace* rather than a second balance. If this screen disagreed with the widget the
+            // user would be looking at what reads as two different balances.
+            val display = status?.let { BalanceSurfaces.display(it) }
+            val overBudget = status?.isOverBudget == true
             Text(
-                "残り予算",
+                display?.headline ?: "今月あと",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 8.dp),
             )
-            val remaining = status?.remainingYen ?: 0L
             Text(
-                "¥${yenFormat.format(remaining)}",
+                display?.amountText ?: "--",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                color = if (overBudget) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.primary,
             )
+
             Spacer(Modifier.height(10.dp))
+            // Days elapsed, not money spent. A money bar would only restate the number directly
+            // above it; against the money figure, a day bar is what shows the gap between how
+            // fast the month is going and how fast the budget is.
             LinearProgressIndicator(
-                progress = { status?.spentRatio ?: 0f },
+                progress = { status?.elapsedRatio ?: 0f },
                 modifier = Modifier.fillMaxWidth(),
-                color = if (status?.isOverBudget == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                color = if (overBudget) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(6.dp))
             Row(
@@ -171,17 +207,56 @@ private fun BalanceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
+                    display?.remainingDaysText ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    display?.paceText ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
                     "使用 ¥${yenFormat.format(status?.spentYen ?: 0L)}",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     "予算 ¥${yenFormat.format(status?.budgetYen ?: 0L)}",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedButton(onClick = onEditBudget, modifier = Modifier.padding(top = 12.dp)) {
                 Text("予算を編集")
             }
+        }
+    }
+}
+
+@Composable
+private fun PersistentNotificationToggle(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("残額を通知に常時表示", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "通知シェードに「今月あと¥○○ ／ 1日 ¥△△ ペース」を出しっぱなしにします。音は鳴りません。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
     }
 }
@@ -239,4 +314,79 @@ private fun BudgetEditDialog(
             TextButton(onClick = onDismiss) { Text("キャンセル") }
         },
     )
+}
+
+/**
+ * Setup/troubleshooting panel. Notification detection has several independent things that must
+ * all be true (permission granted, service actually bound, app allowed to run in background),
+ * and when a purchase produces nothing there is no way to tell which one failed. This surfaces
+ * each of them, plus a way to fix the two most common problems in place.
+ */
+@Composable
+private fun DiagnosticsCard(
+    notificationAccessEnabled: Boolean,
+    listenerConnected: Boolean,
+    onOpenSettings: () -> Unit,
+    onRequestRebind: () -> Unit,
+    onAddTestTransaction: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("動作診断", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+
+            StatusLine(
+                label = "通知アクセスの許可",
+                ok = notificationAccessEnabled,
+                okText = "許可済み",
+                ngText = "未許可",
+            )
+            StatusLine(
+                label = "通知リスナーの接続",
+                ok = listenerConnected,
+                okText = "接続中",
+                ngText = "未接続",
+            )
+
+            if (notificationAccessEnabled && !listenerConnected) {
+                Text(
+                    "許可はされていますがサービスが繋がっていません。アプリを入れ直した直後によく起こります。下の「再接続」を押すか、設定で通知アクセスを一度OFF→ONしてください。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onRequestRebind) { Text("再接続") }
+                OutlinedButton(onClick = onOpenSettings) { Text("通知設定") }
+            }
+            Spacer(Modifier.height(4.dp))
+            OutlinedButton(onClick = onAddTestTransaction) {
+                Text("テスト支出 ¥100 を追加")
+            }
+            Text(
+                "「テスト支出」で残高通知が出れば、予算計算と通知の仕組みは正常です。出るのに実際の買い物で反応しない場合は、通知の検知だけが問題ということになります。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusLine(label: String, ok: Boolean, okText: String, ngText: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            if (ok) "\u2713 $okText" else "\u2717 $ngText",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        )
+    }
 }

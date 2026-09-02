@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ exposes the launcher's own preferred widget corner radius; match it so the card
+     lines up with every other widget on the home screen instead of guessing 16dp. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_background" />
+    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+</shape>

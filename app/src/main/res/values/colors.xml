@@ -4,4 +4,16 @@
     <color name="teal_700">#FF03A9A4</color>
     <color name="red_alert">#FFD32F2F</color>
     <color name="green_safe">#FF2E7D32</color>
+
+    <!--
+      Widget palette. RemoteViews follow the host launcher's theme, so the only thing needed for
+      dark mode is a values-night copy of these five names; nothing in the layout or the provider
+      changes.
+    -->
+    <color name="widget_background">#E61B5E20</color>
+    <color name="widget_text_primary">#FFFFFFFF</color>
+    <color name="widget_text_secondary">#CCFFFFFF</color>
+    <color name="widget_progress">#FF81C784</color>
+    <color name="widget_progress_track">#40FFFFFF</color>
+    <color name="widget_over">#FFFF8A80</color>
 </resources>
